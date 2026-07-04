@@ -1,0 +1,155 @@
+/* =========================
+   PIGEONPROJECT CHAT UI FIX
+   ========================= */
+
+.chat-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: #0b0b0b;
+  color: white;
+}
+
+/* ================= SIDEBAR ================= */
+
+.sidebar {
+  width: 260px;
+  border-right: 1px solid #222;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 8px;
+
+  overflow-y: auto;
+
+  /* IMPORTANT: ensures clicks always work */
+  pointer-events: auto;
+}
+
+.sidebar h3 {
+  margin-bottom: 8px;
+}
+
+/* USER BUTTONS (THIS WAS YOUR MAIN ISSUE) */
+
+.user-btn {
+  width: 100%;
+  padding: 10px 12px;
+  background: #1a1a1a;
+  color: white;
+
+  border: none;
+  border-radius: 8px;
+
+  text-align: left;
+
+  cursor: pointer; /* 🔥 makes clickable obvious */
+  pointer-events: auto; /* 🔥 ensures click works */
+
+  transition: 0.2s ease;
+}
+
+.user-btn:hover {
+  background: #2a2a2a;
+}
+
+/* ================= CHAT AREA ================= */
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+
+  pointer-events: auto;
+}
+
+/* HEADER */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 12px;
+  border-bottom: 1px solid #222;
+}
+
+/* MESSAGES */
+
+.messages {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* MESSAGE */
+
+.message {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: #161616;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+/* INPUT BAR */
+
+.input-bar {
+  display: flex;
+  padding: 12px;
+  border-top: 1px solid #222;
+  gap: 8px;
+}
+
+.input-bar input {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #111;
+  color: white;
+  outline: none;
+
+  pointer-events: auto;
+}
+
+.input-bar button {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #4f46e5;
+  color: white;
+
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.input-bar button:hover {
+  background: #4338ca;
+}
+
+.user-btn {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 8px;
+  background: #222;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.user-btn.selected {
+  background: #4f46e5;
+}
+
+.group-btn {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #333;
+  color: white;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}

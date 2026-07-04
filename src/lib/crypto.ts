@@ -1,36 +1,53 @@
-export async function generateKey() {
-  return crypto.subtle.generateKey(
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"]
-  );
+export async function generateKeyFromChat(chatId: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(chatId);
+
+  const hash = await crypto.subtle.digest("SHA-256", data);
+
+  return new Uint8Array(hash);
 }
 
-export async function encryptMessage(message: string, key: CryptoKey) {
+export async function encryptMessage(message: string, key: Uint8Array) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(message);
 
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
     key,
+    "AES-GCM",
+    false,
+    ["encrypt"]
+  );
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    cryptoKey,
     encoded
   );
 
   return {
-    ciphertext: Array.from(new Uint8Array(ciphertext)),
-    iv: Array.from(iv),
+    encrypted: Array.from(new Uint8Array(encrypted)),
+    iv: Array.from(iv)
   };
 }
 
 export async function decryptMessage(
-  ciphertext: number[],
+  encrypted: number[],
   iv: number[],
-  key: CryptoKey
+  key: Uint8Array
 ) {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    "AES-GCM",
+    false,
+    ["decrypt"]
+  );
+
   const decrypted = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: new Uint8Array(iv) },
-    key,
-    new Uint8Array(ciphertext)
+    cryptoKey,
+    new Uint8Array(encrypted)
   );
 
   return new TextDecoder().decode(decrypted);
