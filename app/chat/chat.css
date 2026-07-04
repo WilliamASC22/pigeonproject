@@ -1,98 +1,225 @@
-/* =========================
-   PIGEONPROJECT CHAT UI FIX
-   ========================= */
-
 .chat-container {
   display: flex;
   height: 100vh;
   width: 100vw;
   background: #0b0b0b;
   color: white;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ================= SIDEBAR ================= */
+.center-screen {
+  align-items: center;
+  justify-content: center;
+}
 
 .sidebar {
-  width: 260px;
+  width: 300px;
   border-right: 1px solid #222;
   display: flex;
   flex-direction: column;
   padding: 12px;
   gap: 8px;
-
   overflow-y: auto;
-
-  /* IMPORTANT: ensures clicks always work */
   pointer-events: auto;
 }
 
 .sidebar h3 {
-  margin-bottom: 8px;
+  margin: 8px 0;
 }
 
-/* USER BUTTONS (THIS WAS YOUR MAIN ISSUE) */
+.sidebar-section-title {
+  margin-top: 18px !important;
+  color: #cccccc;
+  font-size: 15px;
+}
 
 .user-btn {
   width: 100%;
-  padding: 10px 12px;
-  background: #1a1a1a;
+  padding: 12px;
+  background: #222;
   color: white;
-
   border: none;
   border-radius: 8px;
-
   text-align: left;
-
-  cursor: pointer; /* 🔥 makes clickable obvious */
-  pointer-events: auto; /* 🔥 ensures click works */
-
+  cursor: pointer;
+  pointer-events: auto;
   transition: 0.2s ease;
+  font-size: 15px;
+  overflow-wrap: break-word;
 }
 
 .user-btn:hover {
-  background: #2a2a2a;
+  background: #2f2f2f;
 }
 
-/* ================= CHAT AREA ================= */
+.user-btn.selected {
+  background: #4f46e5;
+}
+
+.group-btn {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: #333;
+  color: white;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  text-align: left;
+}
+
+.group-btn:hover {
+  background: #444;
+}
+
+.group-box {
+  background: #151515;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.group-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #0f0f0f;
+  color: white;
+  outline: none;
+  margin-bottom: 8px;
+}
+
+.small-label {
+  color: #bbbbbb;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.group-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.checkbox-row input {
+  cursor: pointer;
+}
+
+.create-group-confirm {
+  width: 100%;
+  padding: 10px;
+  background: #4f46e5;
+  color: white;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.create-group-confirm:hover {
+  background: #4338ca;
+}
+
+.empty-text {
+  color: #888;
+  font-size: 14px;
+  margin: 4px 0 8px;
+}
 
 .chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-
   pointer-events: auto;
 }
-
-/* HEADER */
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
-  padding: 12px;
+  padding: 16px;
   border-bottom: 1px solid #222;
 }
 
-/* MESSAGES */
+.header h3 {
+  margin: 0;
+}
+
+.logout-btn {
+  background: transparent;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.logout-btn:hover {
+  color: #cccccc;
+}
+
+.error-box {
+  margin: 12px;
+  padding: 10px;
+  border: 1px solid #7f1d1d;
+  background: #2a0f0f;
+  color: #fecaca;
+  border-radius: 8px;
+}
 
 .messages {
   flex: 1;
-  padding: 12px;
+  padding: 16px;
   overflow-y: auto;
 }
 
-/* MESSAGE */
+.empty-chat {
+  color: #888;
+}
 
 .message {
   margin-bottom: 10px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: #161616;
-  border-radius: 8px;
+  border-radius: 10px;
   width: fit-content;
+  max-width: 70%;
+  overflow-wrap: anywhere;
 }
 
-/* INPUT BAR */
+.message.mine {
+  background: #4f46e5;
+  margin-left: auto;
+}
+
+.message-text {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.message-sender {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 3px;
+}
+
+.message.mine .message-sender {
+  color: #dcdcff;
+}
 
 .input-bar {
   display: flex;
@@ -103,53 +230,36 @@
 
 .input-bar input {
   flex: 1;
-  padding: 10px;
+  padding: 12px;
   border-radius: 8px;
   border: 1px solid #333;
   background: #111;
   color: white;
   outline: none;
-
   pointer-events: auto;
 }
 
+.input-bar input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .input-bar button {
-  padding: 10px 14px;
+  padding: 12px 18px;
   border-radius: 8px;
   border: none;
   background: #4f46e5;
   color: white;
-
   cursor: pointer;
   pointer-events: auto;
+  font-size: 15px;
 }
 
 .input-bar button:hover {
   background: #4338ca;
 }
 
-.user-btn {
-  width: 100%;
-  padding: 10px;
-  margin: 5px 0;
-  border-radius: 8px;
-  background: #222;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-.user-btn.selected {
-  background: #4f46e5;
-}
-
-.group-btn {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 10px;
+.input-bar button:disabled {
   background: #333;
-  color: white;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
+  cursor: not-allowed;
 }
