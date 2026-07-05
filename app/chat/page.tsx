@@ -2,6 +2,7 @@
 
 import {
   createElement,
+  type FormEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -13,19 +14,33 @@ import "./chat.css";
 
 import { supabase } from "@/src/lib/supabase";
 import {
-  getUsers,
   createProfile,
   getMyChats,
   getOrCreateDirectChat,
-  createGroupChat,
   getMessages,
-  sendMessage
+  sendMessage,
+  getChatMembers,
+  getProfileWithKeys,
+  getProfilesForChatKey,
+  saveUserKeyVault,
+  getMyWrappedChatKey,
+  getChatKeyRowsForChat,
+  saveWrappedChatKey,
+  saveUsername,
+  getMyContacts,
+  type ProfileWithKeys
 } from "@/src/lib/chat";
 
 import {
   encryptMessage,
   decryptMessage,
-  generateKeyFromChat
+  generateChatKey,
+  wrapChatKeyForUser,
+  unwrapChatKeyForUser,
+  createUserKeyBundle,
+  unlockUserKeyBundle,
+  type EncryptedPrivateKeyVault,
+  type UserKeyBundle
 } from "@/src/lib/crypto";
 
 declare global {
@@ -40,6 +55,8 @@ type CallType = "audio" | "video";
 type ChatMember = {
   id: string;
   email: string;
+  username?: string | null;
+  e2ee_public_key?: JsonWebKey | null;
 };
 
 type ChatItem = {
@@ -115,14 +132,23 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
 
   const [chatId, setChatId] = useState<string | null>(null);
-  const [activeKey, setActiveKey] = useState<Uint8Array | null>(null);
+  const [activeKey, setActiveKey] = useState<CryptoKey | null>(null);
+
+  const [userKeyBundle, setUserKeyBundle] = useState<UserKeyBundle | null>(null);
+  const [profileVault, setProfileVault] = useState<ProfileWithKeys | null>(null);
+  const [encryptionMode, setEncryptionMode] = useState<"setup" | "unlock" | null>(
+    null
+  );
+  const [encryptionPassword, setEncryptionPassword] = useState("");
+  const [encryptionBusy, setEncryptionBusy] = useState(false);
+  const [e2eeReady, setE2eeReady] = useState(false);
+
+  const [username, setUsername] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernameMode, setUsernameMode] = useState(false);
 
   const [input, setInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-
-  const [showGroupForm, setShowGroupForm] = useState(false);
-  const [groupName, setGroupName] = useState("");
-  const [selectedGroupUsers, setSelectedGroupUsers] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -157,9 +183,12 @@ export default function ChatPage() {
 
     if (!cleanSearch) return users;
 
-    return users.filter((u) =>
-      (u.email || "").toLowerCase().includes(cleanSearch)
-    );
+    return users.filter((u) => {
+      const email = (u.email || "").toLowerCase();
+      const userName = (u.username || "").toLowerCase();
+
+      return email.includes(cleanSearch) || userName.includes(cleanSearch);
+    });
   }, [users, searchTerm]);
 
   const activeChat = useMemo(() => {
@@ -182,7 +211,7 @@ export default function ChatPage() {
   const getChatAvatar = (chat: ChatItem | null) => {
     if (!chat) return "🕊️";
     if (chat.is_group) return "👥";
-    return chat.title?.charAt(0)?.toUpperCase() || "💬";
+    return chat.title?.replace("@", "")?.charAt(0)?.toUpperCase() || "💬";
   };
 
   const showInfo = (message: string) => {
@@ -199,13 +228,45 @@ export default function ChatPage() {
     setBannerText("");
   };
 
+  const buildVaultFromProfile = (
+    profile: ProfileWithKeys
+  ): EncryptedPrivateKeyVault => {
+    if (
+      !profile.e2ee_public_key ||
+      !profile.e2ee_private_key_ciphertext ||
+      !profile.e2ee_private_key_iv ||
+      !profile.e2ee_private_key_salt
+    ) {
+      throw new Error("This account has not finished encryption setup.");
+    }
+
+    return {
+      version: 2,
+      publicKeyJwk: profile.e2ee_public_key,
+      encryptedPrivateKey: profile.e2ee_private_key_ciphertext,
+      privateKeyIv: profile.e2ee_private_key_iv,
+      privateKeySalt: profile.e2ee_private_key_salt,
+      kdf: "PBKDF2-SHA-256",
+      kdfIterations: profile.e2ee_kdf_iterations || 310000
+    };
+  };
+
+  const profileHasVault = (profile: ProfileWithKeys | null) => {
+    return Boolean(
+      profile?.e2ee_public_key &&
+        profile?.e2ee_private_key_ciphertext &&
+        profile?.e2ee_private_key_iv &&
+        profile?.e2ee_private_key_salt
+    );
+  };
+
   const upsertCallMember = (userId: string, email: string) => {
     setCallMembers((current) => {
       const existing = current.find((member) => member.id === userId);
 
       if (existing) {
         return current.map((member) =>
-          member.id === userId ? { id: userId, email } : member
+          member.id === userId ? { ...member, id: userId, email } : member
         );
       }
 
@@ -566,31 +627,31 @@ export default function ChatPage() {
   }, [broadcastSignal, createOfferForUser, getOrCreatePeerConnection, user]);
 
   const refreshUsersAndChats = useCallback(async (currentUserId: string) => {
-    const allUsers = await getUsers();
-    setUsers(allUsers.filter((u) => u.id !== currentUserId));
+    const contacts = await getMyContacts(currentUserId);
+    setUsers(contacts.filter((u) => u.id !== currentUserId));
 
     const myChats = await getMyChats(currentUserId);
     setChats(myChats as ChatItem[]);
   }, []);
 
-  const loadMessages = useCallback(async (id: string, chatKey: Uint8Array) => {
+  const loadMessages = useCallback(async (id: string, chatKey: CryptoKey) => {
     const data = await getMessages(id);
 
     const decrypted = await Promise.all(
       data.map(async (m: any) => {
         try {
-          const text = await decryptMessage(
-            JSON.parse(m.ciphertext),
-            JSON.parse(m.iv),
-            chatKey
-          );
+          const text = await decryptMessage(m.ciphertext, m.iv, chatKey);
 
           return { ...m, text };
         } catch {
           return {
             ...m,
-            text: "⚠️ cannot decrypt",
-            sender_email: m.sender_email || "Unknown user"
+            text:
+              m.crypto_version === 2
+                ? "⚠️ cannot decrypt"
+                : "⚠️ old message from before the E2EE upgrade",
+            sender_email: m.sender_email || "Unknown user",
+            sender_username: m.sender_username || ""
           };
         }
       })
@@ -598,6 +659,103 @@ export default function ChatPage() {
 
     setMessages(decrypted);
   }, []);
+
+  const ensureChatKeyForChat = useCallback(
+    async (targetChatId: string, knownMembers?: ChatMember[]) => {
+      if (!user || !userKeyBundle) {
+        throw new Error("Unlock encryption before opening chats.");
+      }
+
+      const existingWrappedKey = await getMyWrappedChatKey(targetChatId, user.id);
+
+      if (existingWrappedKey) {
+        const wrappedByProfile = await getProfileWithKeys(
+          existingWrappedKey.wrapped_by_user_id || user.id
+        );
+
+        if (!wrappedByProfile?.e2ee_public_key) {
+          throw new Error("The chat key sender is missing a public key.");
+        }
+
+        return unwrapChatKeyForUser({
+          encryptedChatKey: existingWrappedKey.encrypted_chat_key,
+          iv: existingWrappedKey.iv,
+          myPrivateKey: userKeyBundle.privateKey,
+          wrappedByPublicKeyJwk: wrappedByProfile.e2ee_public_key,
+          chatId: targetChatId
+        });
+      }
+
+      const existingRows = await getChatKeyRowsForChat(targetChatId);
+
+      if (existingRows.length > 0) {
+        throw new Error(
+          "This chat has encryption keys, but this account does not have access to one. Create a new secure chat."
+        );
+      }
+
+      const members =
+        knownMembers && knownMembers.length > 0
+          ? knownMembers
+          : await getChatMembers(targetChatId);
+
+      const memberIds = Array.from(
+        new Set([...members.map((member) => member.id), user.id])
+      );
+
+      const profiles = await getProfilesForChatKey(memberIds);
+
+      const profilesById = new Map<string, ProfileWithKeys>();
+      profiles.forEach((profile) => {
+        profilesById.set(profile.id, profile);
+      });
+
+      if (!profilesById.has(user.id)) {
+        profilesById.set(user.id, {
+          id: user.id,
+          email: user.email,
+          username,
+          e2ee_public_key: userKeyBundle.publicKeyJwk
+        });
+      }
+
+      const profilesToWrap = memberIds.map((id) => profilesById.get(id));
+      const missingProfiles = profilesToWrap.filter(
+        (profile) => !profile?.e2ee_public_key
+      );
+
+      if (missingProfiles.length > 0) {
+        throw new Error(
+          "Every chat member must open PigeonProject once and set up encryption before this chat can use E2EE."
+        );
+      }
+
+      const newChatKey = await generateChatKey();
+
+      for (const profile of profilesToWrap) {
+        if (!profile?.e2ee_public_key) continue;
+
+        const wrapped = await wrapChatKeyForUser({
+          chatKey: newChatKey,
+          myPrivateKey: userKeyBundle.privateKey,
+          otherUserPublicKeyJwk: profile.e2ee_public_key,
+          chatId: targetChatId
+        });
+
+        await saveWrappedChatKey({
+          chat_id: targetChatId,
+          user_id: profile.id,
+          wrapped_by_user_id: user.id,
+          encrypted_chat_key: wrapped.encryptedChatKey,
+          iv: wrapped.iv,
+          algorithm: wrapped.algorithm
+        });
+      }
+
+      return newChatKey;
+    },
+    [user, userKeyBundle, username]
+  );
 
   const sendEncryptedContent = useCallback(
     async (plainText: string) => {
@@ -608,8 +766,10 @@ export default function ChatPage() {
       await sendMessage({
         chat_id: chatId,
         sender_id: user.id,
-        ciphertext: JSON.stringify(encrypted.encrypted),
-        iv: JSON.stringify(encrypted.iv)
+        ciphertext: encrypted.ciphertext,
+        iv: encrypted.iv,
+        crypto_version: encrypted.version,
+        algorithm: encrypted.algorithm
       });
 
       await loadMessages(chatId, activeKey);
@@ -665,6 +825,86 @@ export default function ChatPage() {
     return () => clearTimeout(timeout);
   }, [bannerText]);
 
+  const handleEncryptionSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!user) return;
+
+    clearBanner();
+
+    if (encryptionPassword.length < 12) {
+      showError("Use an encryption password with at least 12 characters.");
+      return;
+    }
+
+    setEncryptionBusy(true);
+
+    try {
+      if (encryptionMode === "setup") {
+        const vault = await createUserKeyBundle(encryptionPassword);
+        await saveUserKeyVault(user.id, vault);
+
+        const unlocked = await unlockUserKeyBundle(encryptionPassword, vault);
+        setUserKeyBundle(unlocked);
+
+        const updatedProfile = await getProfileWithKeys(user.id);
+        setProfileVault(updatedProfile);
+
+        showInfo("Encryption is set up for this account.");
+      } else {
+        if (!profileVault) {
+          throw new Error("Could not find your encryption profile.");
+        }
+
+        const vault = buildVaultFromProfile(profileVault);
+        const unlocked = await unlockUserKeyBundle(encryptionPassword, vault);
+        setUserKeyBundle(unlocked);
+
+        showInfo("Encryption unlocked.");
+      }
+
+      setEncryptionPassword("");
+      setEncryptionMode(null);
+      setE2eeReady(true);
+      await refreshUsersAndChats(user.id);
+    } catch (error: any) {
+      console.error(error);
+      showError(
+        encryptionMode === "setup"
+          ? error.message || "Could not set up encryption."
+          : "Could not unlock encryption. Check your encryption password."
+      );
+    } finally {
+      setEncryptionBusy(false);
+    }
+  };
+
+  const handleSaveUsername = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!user) return;
+
+    clearBanner();
+
+    try {
+      const cleanUsername = await saveUsername(user.id, usernameInput);
+
+      setUsername(cleanUsername);
+      setUsernameInput(cleanUsername);
+      setUsernameMode(false);
+
+      const updatedProfile = await getProfileWithKeys(user.id);
+      setProfileVault(updatedProfile);
+
+      await refreshUsersAndChats(user.id);
+
+      showInfo("Username saved.");
+    } catch (error: any) {
+      console.error(error);
+      showError(error.message || "Could not save username.");
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -678,16 +918,31 @@ export default function ChatPage() {
 
       setUser(data.user);
       await createProfile(data.user);
-      await refreshUsersAndChats(data.user.id);
+
+      const profile = await getProfileWithKeys(data.user.id);
+      setProfileVault(profile);
+
+      if (profile?.username) {
+        setUsername(profile.username);
+        setUsernameInput(profile.username);
+      } else {
+        setUsernameMode(true);
+      }
+
+      if (profileHasVault(profile)) {
+        setEncryptionMode("unlock");
+      } else {
+        setEncryptionMode("setup");
+      }
 
       setLoading(false);
     };
 
     init();
-  }, [router, refreshUsersAndChats]);
+  }, [router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !e2eeReady) return;
 
     ensureSignalChannel();
 
@@ -697,7 +952,7 @@ export default function ChatPage() {
         signalChannelRef.current = null;
       }
     };
-  }, [ensureSignalChannel, user]);
+  }, [e2eeReady, ensureSignalChannel, user]);
 
   useEffect(() => {
     if (!chatId || !activeKey) return;
@@ -798,11 +1053,12 @@ export default function ChatPage() {
 
   const openChatById = async (nextChatId: string) => {
     const chat = chats.find((item) => String(item.id) === String(nextChatId));
+
     if (!chat) {
       throw new Error("Chat not found.");
     }
 
-    const chatKey = await generateKeyFromChat(nextChatId);
+    const chatKey = await ensureChatKeyForChat(nextChatId, chat.members);
     setChatId(nextChatId);
     setActiveKey(chatKey);
     await loadMessages(nextChatId, chatKey);
@@ -832,7 +1088,7 @@ export default function ChatPage() {
     upsertCallMember(user.id, user.email);
 
     if (String(chatId) !== String(targetChatId)) {
-      const chatKey = await generateKeyFromChat(targetChatId);
+      const chatKey = await ensureChatKeyForChat(targetChatId, chat.members);
       setChatId(targetChatId);
       setActiveKey(chatKey);
       await loadMessages(targetChatId, chatKey);
@@ -874,9 +1130,7 @@ export default function ChatPage() {
         recipientIds
       });
 
-      showInfo(
-        `${nextCallType === "video" ? "Video" : "Voice"} call started.`
-      );
+      showInfo(`${nextCallType === "video" ? "Video" : "Voice"} call started.`);
     } catch (error: any) {
       console.error(error);
       showError(error.message || "Could not start call.");
@@ -928,9 +1182,16 @@ export default function ChatPage() {
   };
 
   const openDirectChat = async (otherUser: any) => {
-    if (!user) return;
+    if (!user || !userKeyBundle) return;
 
     clearBanner();
+
+    if (!otherUser.e2ee_public_key) {
+      showError(
+        "This contact must open PigeonProject once and set up encryption before you can message them."
+      );
+      return;
+    }
 
     try {
       if (inCallRef.current) {
@@ -939,8 +1200,9 @@ export default function ChatPage() {
 
       const chat = await getOrCreateDirectChat(user.id, otherUser.id);
       const nextChatId = String(chat.id);
+      const members = await getChatMembers(nextChatId);
 
-      const chatKey = await generateKeyFromChat(nextChatId);
+      const chatKey = await ensureChatKeyForChat(nextChatId, members);
 
       setChatId(nextChatId);
       setActiveKey(chatKey);
@@ -965,7 +1227,7 @@ export default function ChatPage() {
         await leaveCall(true, "Call ended because you switched chats.");
       }
 
-      const chatKey = await generateKeyFromChat(String(chat.id));
+      const chatKey = await ensureChatKeyForChat(String(chat.id), chat.members);
 
       setChatId(String(chat.id));
       setActiveKey(chatKey);
@@ -974,56 +1236,6 @@ export default function ChatPage() {
     } catch (error: any) {
       console.error(error);
       showError(error.message || "Could not open saved chat.");
-    }
-  };
-
-  const toggleGroupUser = (id: string) => {
-    setSelectedGroupUsers((current) => {
-      if (current.includes(id)) {
-        return current.filter((userId) => userId !== id);
-      }
-
-      return [...current, id];
-    });
-  };
-
-  const handleCreateGroupChat = async () => {
-    if (!user) return;
-
-    clearBanner();
-
-    if (selectedGroupUsers.length === 0) {
-      showError("Choose at least one person for the group chat.");
-      return;
-    }
-
-    try {
-      if (inCallRef.current) {
-        await leaveCall(true, "Call ended because you switched chats.");
-      }
-
-      const chat = await createGroupChat(
-        user.id,
-        selectedGroupUsers,
-        groupName || "Group Chat"
-      );
-
-      const nextChatId = String(chat.id);
-      const chatKey = await generateKeyFromChat(nextChatId);
-
-      setChatId(nextChatId);
-      setActiveKey(chatKey);
-
-      setShowGroupForm(false);
-      setGroupName("");
-      setSelectedGroupUsers([]);
-
-      await loadMessages(nextChatId, chatKey);
-      await refreshUsersAndChats(user.id);
-      showInfo("Group chat created.");
-    } catch (error: any) {
-      console.error(error);
-      showError(error.message || "Could not create group chat.");
     }
   };
 
@@ -1133,6 +1345,13 @@ export default function ChatPage() {
     setMessages([]);
     setChatId(null);
     setActiveKey(null);
+    setUserKeyBundle(null);
+    setE2eeReady(false);
+    setEncryptionMode(null);
+    setEncryptionPassword("");
+    setUsername("");
+    setUsernameInput("");
+    setUsernameMode(false);
 
     router.replace("/login");
   };
@@ -1149,6 +1368,100 @@ export default function ChatPage() {
     );
   }
 
+  if (!e2eeReady) {
+    return (
+      <div className="chat-shell loading-shell">
+        <form className="loading-card" onSubmit={handleEncryptionSubmit}>
+          <div className="loading-mark">🔐</div>
+
+          <h2>
+            {encryptionMode === "setup"
+              ? "Set up encryption"
+              : "Unlock encryption"}
+          </h2>
+
+          <p>
+            {encryptionMode === "setup"
+              ? "Create a separate encryption password. Do not forget it."
+              : "Enter your encryption password to open your saved chats."}
+          </p>
+
+          <input
+            className="group-name-input"
+            type="password"
+            value={encryptionPassword}
+            onChange={(event) => setEncryptionPassword(event.target.value)}
+            placeholder="Encryption password"
+            autoComplete="current-password"
+          />
+
+          <button
+            className="create-group-button"
+            type="submit"
+            disabled={encryptionBusy}
+          >
+            {encryptionBusy
+              ? "Please wait..."
+              : encryptionMode === "setup"
+                ? "Set up encryption"
+                : "Unlock messages"}
+          </button>
+
+          {bannerText && (
+            <div
+              className={
+                bannerType === "error"
+                  ? "status-banner error"
+                  : "status-banner info"
+              }
+            >
+              {bannerText}
+            </div>
+          )}
+        </form>
+      </div>
+    );
+  }
+
+  if (usernameMode) {
+    return (
+      <div className="chat-shell loading-shell">
+        <form className="loading-card" onSubmit={handleSaveUsername}>
+          <div className="loading-mark">🕊️</div>
+
+          <h2>Choose a username</h2>
+
+          <p>People will use this username to send you a contact request.</p>
+
+          <input
+            className="group-name-input"
+            type="text"
+            value={usernameInput}
+            onChange={(event) => setUsernameInput(event.target.value)}
+            placeholder="example: john_123"
+            autoComplete="username"
+          />
+
+          <button className="create-group-button" type="submit">
+            Save username
+          </button>
+
+          {bannerText && (
+            <div
+              className={
+                bannerType === "error"
+                  ? "status-banner error"
+                  : "status-banner info"
+              }
+            >
+              {bannerText}
+            </div>
+          )}
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="chat-shell">
       <aside className="sidebar">
@@ -1158,16 +1471,27 @@ export default function ChatPage() {
 
             <div className="profile-text">
               <strong>{user?.email}</strong>
-              <span>Encrypted messaging</span>
+              <span>
+                {username ? `@${username} • E2EE unlocked` : "E2EE unlocked"}
+              </span>
             </div>
           </div>
 
           <button
             className="new-group-button"
-            onClick={() => setShowGroupForm((value) => !value)}
+            type="button"
+            onClick={() => router.push("/groups")}
           >
             <span className="new-group-plus">+</span>
             New group
+          </button>
+
+          <button
+            className="create-group-button"
+            type="button"
+            onClick={() => router.push("/contacts")}
+          >
+            Contacts and requests
           </button>
 
           <div className="search-wrap">
@@ -1175,69 +1499,15 @@ export default function ChatPage() {
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search chats or users"
+              placeholder="Search chats or contacts"
             />
           </div>
 
           <p className="discoverability-note">
-            Right now every signed-up user appears in the user list.
+            Only accepted contacts appear here. Manage requests on the Contacts
+            page.
           </p>
         </div>
-
-        {showGroupForm && (
-          <div className="group-card">
-            <div className="group-card-header">
-              <h3>Create group</h3>
-
-              <button
-                className="close-group-button"
-                onClick={() => setShowGroupForm(false)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <label className="group-label">Group name</label>
-
-            <input
-              className="group-name-input"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Weekend plans"
-            />
-
-            <label className="group-label">Add people</label>
-
-            <div className="group-user-list">
-              {users.length === 0 ? (
-                <p className="empty-side-text">No other users yet.</p>
-              ) : (
-                users.map((u) => (
-                  <label key={u.id} className="group-user-row">
-                    <input
-                      type="checkbox"
-                      checked={selectedGroupUsers.includes(u.id)}
-                      onChange={() => toggleGroupUser(u.id)}
-                    />
-
-                    <span className="small-avatar">
-                      {u.email?.charAt(0)?.toUpperCase() || "U"}
-                    </span>
-
-                    <span className="group-user-email">{u.email}</span>
-                  </label>
-                ))
-              )}
-            </div>
-
-            <button
-              className="create-group-button"
-              onClick={handleCreateGroupChat}
-            >
-              Create group chat
-            </button>
-          </div>
-        )}
 
         <div className="chat-section-label">Chats</div>
 
@@ -1272,13 +1542,13 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="chat-section-label contacts-label">
-          All registered users
-        </div>
+        <div className="chat-section-label contacts-label">Contacts</div>
 
         <div className="chat-list contacts-list">
           {filteredUsers.length === 0 ? (
-            <p className="empty-side-text">No users found.</p>
+            <p className="empty-side-text">
+              No contacts yet. Add someone from the Contacts page.
+            </p>
           ) : (
             filteredUsers.map((u) => (
               <button
@@ -1287,12 +1557,14 @@ export default function ChatPage() {
                 onClick={() => openDirectChat(u)}
               >
                 <div className="chat-row-avatar">
-                  {u.email?.charAt(0)?.toUpperCase() || "U"}
+                  {u.username
+                    ? u.username.charAt(0).toUpperCase()
+                    : u.email?.charAt(0)?.toUpperCase() || "U"}
                 </div>
 
                 <div className="chat-row-main">
                   <div className="chat-row-top">
-                    <strong>{u.email}</strong>
+                    <strong>{u.username ? `@${u.username}` : u.email}</strong>
                   </div>
 
                   <div className="chat-row-bottom">
@@ -1308,17 +1580,15 @@ export default function ChatPage() {
       <main className="chat-main">
         <header className="chat-header">
           <div className="chat-header-left">
-            <div className="chat-header-avatar">
-              {getChatAvatar(activeChat)}
-            </div>
+            <div className="chat-header-avatar">{getChatAvatar(activeChat)}</div>
 
             <div className="chat-header-text">
               <h2>{activeChat ? activeChat.title : "PigeonProject"}</h2>
               <p>
                 {activeChat
                   ? activeChat.is_group
-                    ? `${activeChat.members?.length || 0} members • encrypted chat`
-                    : "Direct message • encrypted chat"
+                    ? `${activeChat.members?.length || 0} members • E2EE chat`
+                    : "Direct message • E2EE chat"
                   : "Select a chat to start messaging"}
               </p>
             </div>
@@ -1474,8 +1744,8 @@ export default function ChatPage() {
               <div className="empty-chat-icon">💬</div>
               <h3>Keep your chats together</h3>
               <p>
-                Open an existing conversation, start a direct chat, or create a
-                new group.
+                Open an existing conversation, start a direct chat with an
+                accepted contact, or create a new group.
               </p>
             </div>
           ) : messages.length === 0 ? (
@@ -1509,7 +1779,9 @@ export default function ChatPage() {
 
                       <div className="message-meta">
                         <span className="message-sender">
-                          {m.sender_email || "Unknown user"}
+                          {m.sender_username
+                            ? `@${m.sender_username}`
+                            : m.sender_email || "Unknown user"}
                         </span>
 
                         <span className="message-time">
@@ -1606,7 +1878,7 @@ export default function ChatPage() {
           <button
             className="send-button"
             onClick={handleSend}
-            disabled={!chatId || !input.trim()}
+            disabled={!chatId || !activeKey || !input.trim()}
           >
             Send
           </button>
