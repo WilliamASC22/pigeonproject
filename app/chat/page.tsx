@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { useRouter } from "next/navigation";
 import "./chat.css";
 
@@ -22,10 +29,8 @@ import {
 } from "@/src/lib/crypto";
 
 declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      "emoji-picker": any;
-    }
+  interface Window {
+    __pigeonEmojiScriptLoaded?: boolean;
   }
 }
 
@@ -59,11 +64,30 @@ type RemoteMedia = {
   stream: MediaStream;
 };
 
-declare global {
-  interface Window {
-    __pigeonEmojiScriptLoaded?: boolean;
-  }
-}
+type GifItem = {
+  id: string;
+  label: string;
+  emoji: string;
+};
+
+const GIF_MESSAGE_PREFIX = "__PIGEON_GIF__:";
+
+const PRESET_GIFS: GifItem[] = [
+  { id: "celebrate", label: "Celebrate", emoji: "🎉" },
+  { id: "heart", label: "Love", emoji: "💖" },
+  { id: "laugh", label: "Laugh", emoji: "😂" },
+  { id: "clap", label: "Clap", emoji: "👏" },
+  { id: "wow", label: "Wow", emoji: "😮" },
+  { id: "party", label: "Party", emoji: "🥳" },
+  { id: "fire", label: "Fire", emoji: "🔥" },
+  { id: "yes", label: "Yes", emoji: "👍" }
+];
+
+const isGifMessage = (value: string) =>
+  typeof value === "string" && value.startsWith(GIF_MESSAGE_PREFIX);
+
+const getGifIdFromMessage = (value: string) =>
+  isGifMessage(value) ? value.slice(GIF_MESSAGE_PREFIX.length) : "";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -106,6 +130,7 @@ export default function ChatPage() {
   const [bannerType, setBannerType] = useState<BannerType>("info");
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
 
   const [incomingCall, setIncomingCall] = useState<IncomingCall>(null);
   const [inCall, setInCall] = useState(false);
@@ -119,6 +144,7 @@ export default function ChatPage() {
 
   const filteredChats = useMemo(() => {
     const cleanSearch = searchTerm.toLowerCase().trim();
+
     if (!cleanSearch) return chats;
 
     return chats.filter((chat) =>
@@ -128,6 +154,7 @@ export default function ChatPage() {
 
   const filteredUsers = useMemo(() => {
     const cleanSearch = searchTerm.toLowerCase().trim();
+
     if (!cleanSearch) return users;
 
     return users.filter((u) =>
@@ -190,7 +217,11 @@ export default function ChatPage() {
     setCallMembers((current) => current.filter((member) => member.id !== userId));
   };
 
-  const upsertRemoteMedia = (userId: string, email: string, stream: MediaStream) => {
+  const upsertRemoteMedia = (
+    userId: string,
+    email: string,
+    stream: MediaStream
+  ) => {
     setRemoteMedia((current) => {
       const existing = current.find((item) => item.userId === userId);
 
@@ -266,22 +297,19 @@ export default function ChatPage() {
     ids.forEach((id) => destroyPeerConnection(id));
   };
 
-  const broadcastSignal = useCallback(
-    async (event: string, payload: any) => {
-      if (!signalChannelRef.current) return;
+  const broadcastSignal = useCallback(async (event: string, payload: any) => {
+    if (!signalChannelRef.current) return;
 
-      try {
-        await signalChannelRef.current.send({
-          type: "broadcast",
-          event,
-          payload
-        });
-      } catch (error) {
-        console.error(`broadcast ${event} error:`, error);
-      }
-    },
-    []
-  );
+    try {
+      await signalChannelRef.current.send({
+        type: "broadcast",
+        event,
+        payload
+      });
+    } catch (error) {
+      console.error(`broadcast ${event} error:`, error);
+    }
+  }, []);
 
   const startLocalMedia = async (nextCallType: CallType) => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -365,14 +393,11 @@ export default function ChatPage() {
     async (remoteUserId: string, remoteEmail: string) => {
       const pc = await getOrCreatePeerConnection(remoteUserId, remoteEmail);
 
-      if (pc.signalingState !== "stable") {
-        return;
-      }
+      if (pc.signalingState !== "stable") return;
+      if (!currentUserRef.current || !callChatIdRef.current) return;
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-
-      if (!currentUserRef.current || !callChatIdRef.current) return;
 
       await broadcastSignal("signal", {
         chatId: callChatIdRef.current,
@@ -574,6 +599,42 @@ export default function ChatPage() {
     setMessages(decrypted);
   }, []);
 
+  const sendEncryptedContent = useCallback(
+    async (plainText: string) => {
+      if (!chatId || !user || !activeKey) return;
+
+      const encrypted = await encryptMessage(plainText, activeKey);
+
+      await sendMessage({
+        chat_id: chatId,
+        sender_id: user.id,
+        ciphertext: JSON.stringify(encrypted.encrypted),
+        iv: JSON.stringify(encrypted.iv)
+      });
+
+      await loadMessages(chatId, activeKey);
+      await refreshUsersAndChats(user.id);
+    },
+    [activeKey, chatId, loadMessages, refreshUsersAndChats, user]
+  );
+
+  const handleSendGif = async (gifId: string) => {
+    if (!chatId) {
+      showInfo("Open a chat first.");
+      return;
+    }
+
+    clearBanner();
+
+    try {
+      await sendEncryptedContent(`${GIF_MESSAGE_PREFIX}${gifId}`);
+      setShowGifPicker(false);
+    } catch (error: any) {
+      console.error(error);
+      showError(error.message || "Could not send GIF.");
+    }
+  };
+
   useEffect(() => {
     currentUserRef.current = user;
   }, [user]);
@@ -710,17 +771,18 @@ export default function ChatPage() {
 
       if (!emojiPickerWrapRef.current.contains(event.target as Node)) {
         setShowEmojiPicker(false);
+        setShowGifPicker(false);
       }
     };
 
-    if (showEmojiPicker) {
+    if (showEmojiPicker || showGifPicker) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showEmojiPicker]);
+  }, [showEmojiPicker, showGifPicker]);
 
   useEffect(() => {
     return () => {
@@ -838,7 +900,11 @@ export default function ChatPage() {
       }
 
       await openChatById(String(incomingCall.chatId));
-      await joinLocalCall(String(incomingCall.chatId), incomingCall.callType, chat);
+      await joinLocalCall(
+        String(incomingCall.chatId),
+        incomingCall.callType,
+        chat
+      );
 
       await broadcastSignal("join-call", {
         chatId: incomingCall.chatId,
@@ -967,21 +1033,84 @@ export default function ChatPage() {
     clearBanner();
 
     try {
-      const encrypted = await encryptMessage(input.trim(), activeKey);
-
-      await sendMessage({
-        chat_id: chatId,
-        sender_id: user.id,
-        ciphertext: JSON.stringify(encrypted.encrypted),
-        iv: JSON.stringify(encrypted.iv)
-      });
-
+      await sendEncryptedContent(input.trim());
       setInput("");
-      await loadMessages(chatId, activeKey);
-      await refreshUsersAndChats(user.id);
     } catch (error: any) {
       console.error(error);
       showError(error.message || "Could not send message.");
+    }
+  };
+
+  const renderGifSticker = (gifId: string, compact = false) => {
+    const sizeClass = compact ? "small" : "";
+
+    switch (gifId) {
+      case "celebrate":
+        return (
+          <div className={`gif-sticker gif-celebrate ${sizeClass}`}>
+            <span className="gif-spark spark-1">✨</span>
+            <span className="gif-spark spark-2">🎉</span>
+            <span className="gif-spark spark-3">✨</span>
+            <span className="gif-main-text">YAY</span>
+          </div>
+        );
+
+      case "heart":
+        return (
+          <div className={`gif-sticker gif-heart ${sizeClass}`}>
+            <span className="gif-heart-emoji">💖</span>
+            <span className="gif-main-text">LOVE</span>
+          </div>
+        );
+
+      case "laugh":
+        return (
+          <div className={`gif-sticker gif-laugh ${sizeClass}`}>
+            <span className="gif-face">😂</span>
+            <span className="gif-main-text">LOL</span>
+          </div>
+        );
+
+      case "clap":
+        return (
+          <div className={`gif-sticker gif-clap ${sizeClass}`}>
+            <span className="gif-face">👏</span>
+            <span className="gif-main-text">CLAP</span>
+          </div>
+        );
+
+      case "wow":
+        return (
+          <div className={`gif-sticker gif-wow ${sizeClass}`}>
+            <span className="gif-face">😮</span>
+            <span className="gif-main-text">WOW</span>
+          </div>
+        );
+
+      case "party":
+        return (
+          <div className={`gif-sticker gif-party ${sizeClass}`}>
+            <span className="gif-face">🥳</span>
+            <span className="gif-main-text">PARTY</span>
+          </div>
+        );
+
+      case "fire":
+        return (
+          <div className={`gif-sticker gif-fire ${sizeClass}`}>
+            <span className="gif-face">🔥</span>
+            <span className="gif-main-text">FIRE</span>
+          </div>
+        );
+
+      case "yes":
+      default:
+        return (
+          <div className={`gif-sticker gif-yes ${sizeClass}`}>
+            <span className="gif-face">👍</span>
+            <span className="gif-main-text">YES</span>
+          </div>
+        );
     }
   };
 
@@ -1237,7 +1366,8 @@ export default function ChatPage() {
             <div className="incoming-call-text">
               <strong>{incomingCall.fromEmail}</strong>
               <span>
-                Incoming {incomingCall.callType === "video" ? "video" : "voice"} call
+                Incoming{" "}
+                {incomingCall.callType === "video" ? "video" : "voice"} call
               </span>
             </div>
 
@@ -1259,7 +1389,8 @@ export default function ChatPage() {
               <div>
                 <h3>{callType === "video" ? "Video call" : "Voice call"}</h3>
                 <p>
-                  {callMembers.length} participant{callMembers.length === 1 ? "" : "s"}
+                  {callMembers.length} participant
+                  {callMembers.length === 1 ? "" : "s"}
                 </p>
               </div>
 
@@ -1368,7 +1499,13 @@ export default function ChatPage() {
                         isMine ? "message-bubble mine" : "message-bubble"
                       }
                     >
-                      <div className="message-text">{m.text}</div>
+                      {isGifMessage(m.text) ? (
+                        <div className="message-gif-wrap">
+                          {renderGifSticker(getGifIdFromMessage(m.text))}
+                        </div>
+                      ) : (
+                        <div className="message-text">{m.text}</div>
+                      )}
 
                       <div className="message-meta">
                         <span className="message-sender">
@@ -1395,14 +1532,61 @@ export default function ChatPage() {
               className="composer-icon-button"
               type="button"
               title="Emoji picker"
-              onClick={() => setShowEmojiPicker((value) => !value)}
+              onClick={() => {
+                setShowGifPicker(false);
+                setShowEmojiPicker((value) => !value);
+              }}
             >
               😊
             </button>
 
+            <button
+              className="composer-gif-button"
+              type="button"
+              title="GIF picker"
+              onClick={() => {
+                setShowEmojiPicker(false);
+                setShowGifPicker((value) => !value);
+              }}
+            >
+              GIF
+            </button>
+
             {showEmojiPicker && (
               <div className="emoji-picker-popover">
-                <emoji-picker ref={emojiPickerRef}></emoji-picker>
+                {createElement("emoji-picker", {
+                  ref: (node: Element | null) => {
+                    emojiPickerRef.current = node as HTMLElement | null;
+                  }
+                })}
+              </div>
+            )}
+
+            {showGifPicker && (
+              <div className="gif-picker-popover">
+                <div className="gif-picker-header">
+                  <strong>Preset GIFs</strong>
+                  <span>Animated reactions</span>
+                </div>
+
+                <div className="gif-grid">
+                  {PRESET_GIFS.map((gif) => (
+                    <button
+                      key={gif.id}
+                      className="gif-option-button"
+                      type="button"
+                      onClick={() => handleSendGif(gif.id)}
+                    >
+                      <div className="gif-option-preview">
+                        {renderGifSticker(gif.id, true)}
+                      </div>
+
+                      <span className="gif-option-label">
+                        {gif.emoji} {gif.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
