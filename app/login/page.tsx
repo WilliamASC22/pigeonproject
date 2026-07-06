@@ -1,220 +1,291 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { createProfile } from "@/src/lib/chat";
+
+type AuthMode = "signin" | "signup";
+type BannerType = "info" | "error";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [authMode, setAuthMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [bannerText, setBannerText] = useState("");
+  const [bannerType, setBannerType] = useState<BannerType>("info");
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [errorText, setErrorText] = useState("");
+  const isSignIn = authMode === "signin";
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const pageTitle = useMemo(() => {
+    return isSignIn ? "Sign in securely" : "Create your account";
+  }, [isSignIn]);
+
+  const pageSubtitle = useMemo(() => {
+    return isSignIn
+      ? "Access your account, then unlock encryption to view your saved conversations."
+      : "Create an account, then set up encryption before starting private conversations.";
+  }, [isSignIn]);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getUser();
+
+      if (data.user) {
+        router.replace("/chat");
+      }
+    };
+
+    checkSession();
+  }, [router]);
+
+  const showInfo = (message: string) => {
+    setBannerType("info");
+    setBannerText(message);
+  };
+
+  const showError = (message: string) => {
+    setBannerType("error");
+    setBannerText(message);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    setMessage("");
-    setErrorText("");
+    setBannerText("");
 
     const cleanEmail = email.trim().toLowerCase();
 
-    if (!cleanEmail || !password) {
-      setErrorText("Enter your email and password.");
+    if (!cleanEmail) {
+      showError("Enter your email address.");
       return;
     }
 
-    if (password.length < 8) {
-      setErrorText("Use a password with at least 8 characters.");
+    if (accountPassword.length < 8) {
+      showError("Use an account password with at least 8 characters.");
       return;
     }
 
-    setLoading(true);
+    setBusy(true);
 
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
+      if (isSignIn) {
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
-          password
+          password: accountPassword
         });
 
         if (error) {
-          setErrorText(error.message);
-          return;
+          throw error;
+        }
+
+        if (data.user) {
+          await createProfile(data.user);
         }
 
         router.replace("/chat");
         return;
       }
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
-        password,
-        options: {
-          emailRedirectTo:
-            typeof window !== "undefined"
-              ? `${window.location.origin}/chat`
-              : undefined
-        }
+        password: accountPassword
       });
 
       if (error) {
-        setErrorText(error.message);
-        return;
+        throw error;
       }
 
-      setMessage("Account created. Check your email if confirmation is required, then sign in.");
-      setMode("signin");
+      if (data.user) {
+        await createProfile(data.user);
+      }
+
+      showInfo(
+        "Account created. If email confirmation is required, check your inbox before signing in."
+      );
+
+      setAuthMode("signin");
+      setAccountPassword("");
+    } catch (error: any) {
+      console.error(error);
+      showError(error.message || "Authentication failed. Please try again.");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  }
+  };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#06110f] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,168,132,0.22),transparent_30%),radial-gradient(circle_at_80%_80%,rgba(79,70,229,0.18),transparent_34%)]" />
-
-      <section className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10">
-        <div className="grid w-full max-w-6xl overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04] shadow-2xl backdrop-blur md:grid-cols-[1.05fr_0.95fr]">
-          <div className="hidden flex-col justify-between bg-[#0b1f1a] p-10 md:flex">
+    <main className="min-h-screen bg-[#06110f] px-4 py-6 text-white sm:px-6 lg:px-8">
+      <section className="mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-7xl items-center justify-center">
+        <div className="grid w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d1211] shadow-2xl shadow-black/50 lg:grid-cols-[1fr_0.95fr]">
+          <aside className="flex flex-col bg-[#06251f] p-7 sm:p-10 lg:p-12">
             <div>
-              <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00a884] text-3xl shadow-lg">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00a884] text-4xl shadow-lg shadow-[#00a884]/20">
                 🕊️
               </div>
 
-              <h1 className="max-w-lg text-5xl font-semibold tracking-tight">
+              <p className="mt-10 text-xs font-black uppercase tracking-[0.35em] text-[#00d6aa]">
+                Secure Public Messaging
+              </p>
+
+              <h1 className="mt-5 text-5xl font-black tracking-[-0.06em] sm:text-6xl">
                 PigeonProject
               </h1>
 
-              <p className="mt-5 max-w-md text-lg leading-8 text-white/72">
-                Private messaging with saved encrypted conversations, direct chats, group chats, emoji support, and browser-based calling.
+              <p className="mt-6 max-w-2xl text-lg font-semibold leading-8 text-white/70">
+                A privacy-focused messaging platform for saved encrypted
+                conversations, direct chats, group chats, contact requests, and
+                browser-based communication.
               </p>
             </div>
 
-            <div className="grid gap-3 text-sm text-white/70">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <strong className="block text-white">Encrypted storage</strong>
-                Messages are stored as encrypted data, not normal readable text.
-              </div>
+            <div className="mt-10 grid gap-4">
+              <InfoCard
+                title="Encrypted messages"
+                text="Message content is encrypted in the browser before it is saved, so the database stores encrypted message data instead of normal readable conversation text."
+              />
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <strong className="block text-white">Public access</strong>
-                Users can sign in from the web and see saved messages after logging in.
-              </div>
+              <InfoCard
+                title="Saved conversations"
+                text="Users can return later, sign in, unlock encryption, and continue their saved direct chats and group chats."
+              />
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <strong className="block text-white">Security note</strong>
-                Keep your password private. Do not share sensitive data until full E2EE key management is finished.
-              </div>
+              <InfoCard
+                title="Private encryption unlock"
+                text="PigeonProject uses a separate encryption password to help protect each user’s private encryption key."
+              />
             </div>
-          </div>
+          </aside>
 
-          <div className="bg-[#111716] p-6 sm:p-10">
-            <div className="mx-auto flex max-w-md flex-col justify-center py-4 md:min-h-[640px]">
-              <div className="mb-8 md:hidden">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00a884] text-2xl">
-                  🕊️
-                </div>
-                <h1 className="text-3xl font-semibold">PigeonProject</h1>
-              </div>
+          <section className="flex items-center p-7 sm:p-10 lg:p-12">
+            <div className="w-full">
+              <p className="text-xs font-black uppercase tracking-[0.35em] text-[#00d6aa]">
+                Account Access
+              </p>
 
-              <div className="mb-8">
-                <p className="mb-3 text-sm font-semibold uppercase tracking-[0.25em] text-[#00a884]">
-                  Secure messaging
-                </p>
+              <h2 className="mt-5 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
+                {pageTitle}
+              </h2>
 
-                <h2 className="text-3xl font-semibold">
-                  {mode === "signin" ? "Welcome back" : "Create your account"}
-                </h2>
+              <p className="mt-5 max-w-xl text-base font-semibold leading-7 text-white/60">
+                {pageSubtitle}
+              </p>
 
-                <p className="mt-3 text-sm leading-6 text-white/60">
-                  {mode === "signin"
-                    ? "Sign in to open your saved conversations."
-                    : "Create an account to start using PigeonProject."}
-                </p>
-              </div>
+              <form onSubmit={handleSubmit} className="mt-8 grid gap-4">
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="mb-2 block text-sm font-bold text-white/85"
+                  >
+                    Email address
+                  </label>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-white/80">
-                    Email
-                  </span>
                   <input
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
+                    id="email"
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
-                    className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-white outline-none transition placeholder:text-white/35 focus:border-[#00a884] focus:ring-4 focus:ring-[#00a884]/15"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    disabled={busy}
+                    className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 text-base font-semibold text-white outline-none placeholder:text-white/35 focus:border-[#00d6aa] focus:ring-4 focus:ring-[#00d6aa]/10 disabled:cursor-not-allowed disabled:opacity-60"
                   />
-                </label>
+                </div>
 
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-white/80">
-                    Password
-                  </span>
+                <div>
+                  <label
+                    htmlFor="account-password"
+                    className="mb-2 block text-sm font-bold text-white/85"
+                  >
+                    Account password
+                  </label>
+
                   <input
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    id="account-password"
                     type="password"
-                    autoComplete={
-                      mode === "signin" ? "current-password" : "new-password"
-                    }
-                    placeholder="At least 8 characters"
-                    className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-white outline-none transition placeholder:text-white/35 focus:border-[#00a884] focus:ring-4 focus:ring-[#00a884]/15"
+                    autoComplete={isSignIn ? "current-password" : "new-password"}
+                    placeholder="Enter your account password"
+                    value={accountPassword}
+                    onChange={(event) => setAccountPassword(event.target.value)}
+                    disabled={busy}
+                    className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 text-base font-semibold text-white outline-none placeholder:text-white/35 focus:border-[#00d6aa] focus:ring-4 focus:ring-[#00d6aa]/10 disabled:cursor-not-allowed disabled:opacity-60"
                   />
-                </label>
+                </div>
 
-                {errorText && (
-                  <div className="rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                    {errorText}
+                {bannerText ? (
+                  <div
+                    role="status"
+                    className={
+                      bannerType === "error"
+                        ? "rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm font-bold leading-6 text-red-100"
+                        : "rounded-2xl border border-[#00a884]/30 bg-[#00a884]/10 p-4 text-sm font-bold leading-6 text-emerald-100"
+                    }
+                  >
+                    {bannerText}
                   </div>
-                )}
-
-                {message && (
-                  <div className="rounded-2xl border border-[#00a884]/30 bg-[#00a884]/10 px-4 py-3 text-sm text-emerald-100">
-                    {message}
-                  </div>
-                )}
+                ) : null}
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="h-12 w-full rounded-2xl bg-[#00a884] font-semibold text-white shadow-lg shadow-[#00a884]/15 transition hover:bg-[#06b48f] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={busy}
+                  className="mt-2 h-14 rounded-2xl bg-[#00a884] text-base font-black text-white shadow-lg shadow-[#00a884]/20 transition hover:bg-[#06b48f] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading
+                  {busy
                     ? "Please wait..."
-                    : mode === "signin"
+                    : isSignIn
                       ? "Sign In"
                       : "Create Account"}
                 </button>
               </form>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-white/60">
-                PigeonProject saves encrypted message data in Supabase. Full Signal-style security requires the next encryption upgrade with user-owned private keys.
+              <div className="mt-7 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+                <h3 className="text-base font-black">Security model</h3>
+
+                <p className="mt-3 text-sm font-semibold leading-7 text-white/65">
+                  PigeonProject is designed so plaintext message content is not
+                  stored in Supabase. Messages are encrypted before storage, and
+                  users must unlock encryption to read saved conversations.
+                </p>
+              </div>
+
+              <div className="mt-5 rounded-3xl border border-yellow-300/25 bg-yellow-300/10 p-5 text-sm font-bold leading-7 text-yellow-100">
+                No public app can honestly promise that hacking is impossible.
+                Keep your account password, encryption password, and device
+                secure. Use an independent security audit before sensitive
+                production use.
               </div>
 
               <button
                 type="button"
                 onClick={() => {
-                  setMode(mode === "signin" ? "signup" : "signin");
-                  setErrorText("");
-                  setMessage("");
+                  setBannerText("");
+                  setAccountPassword("");
+                  setAuthMode(isSignIn ? "signup" : "signin");
                 }}
-                className="mt-6 text-sm font-medium text-[#00a884] hover:text-[#22d3b0]"
+                disabled={busy}
+                className="mt-7 w-full text-center text-sm font-black text-[#00d6aa] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {mode === "signin"
-                  ? "Need an account? Sign up"
+                {isSignIn
+                  ? "Need an account? Create one"
                   : "Already have an account? Sign in"}
               </button>
             </div>
-          </div>
+          </section>
         </div>
       </section>
     </main>
+  );
+}
+
+function InfoCard({ title, text }: { title: string; text: string }) {
+  return (
+    <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+      <h2 className="text-lg font-black text-white">{title}</h2>
+      <p className="mt-2 text-sm font-semibold leading-7 text-white/65">
+        {text}
+      </p>
+    </article>
   );
 }

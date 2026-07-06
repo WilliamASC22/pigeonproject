@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  createElement,
   type FormEvent,
   useCallback,
   useEffect,
@@ -42,12 +41,6 @@ import {
   type EncryptedPrivateKeyVault,
   type UserKeyBundle
 } from "@/src/lib/crypto";
-
-declare global {
-  interface Window {
-    __pigeonEmojiScriptLoaded?: boolean;
-  }
-}
 
 type BannerType = "info" | "error";
 type CallType = "audio" | "video";
@@ -100,6 +93,49 @@ const PRESET_GIFS: GifItem[] = [
   { id: "yes", label: "Yes", emoji: "👍" }
 ];
 
+const EMOJI_PICKER_OPTIONS = [
+  "😀",
+  "😄",
+  "😂",
+  "🤣",
+  "😊",
+  "😍",
+  "🥰",
+  "😘",
+  "😎",
+  "🤔",
+  "😮",
+  "😢",
+  "😭",
+  "😡",
+  "🙏",
+  "👏",
+  "👍",
+  "👎",
+  "💪",
+  "🙌",
+  "🤝",
+  "👀",
+  "💯",
+  "✨",
+  "🎉",
+  "🥳",
+  "🔥",
+  "💖",
+  "❤️",
+  "💙",
+  "✅",
+  "❌",
+  "🕊️",
+  "📌",
+  "📎",
+  "🔒",
+  "🔐",
+  "🛡️",
+  "⭐",
+  "🌙"
+];
+
 const isGifMessage = (value: string) =>
   typeof value === "string" && value.startsWith(GIF_MESSAGE_PREFIX);
 
@@ -110,7 +146,6 @@ export default function ChatPage() {
   const router = useRouter();
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const emojiPickerRef = useRef<HTMLElement | null>(null);
   const emojiPickerWrapRef = useRef<HTMLDivElement | null>(null);
 
   const signalChannelRef = useRef<any>(null);
@@ -987,40 +1022,6 @@ export default function ChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.customElements?.get("emoji-picker")) return;
-    if (window.__pigeonEmojiScriptLoaded) return;
-
-    const script = document.createElement("script");
-    script.type = "module";
-    script.src = "https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js";
-    script.onload = () => {
-      window.__pigeonEmojiScriptLoaded = true;
-    };
-
-    document.head.appendChild(script);
-    window.__pigeonEmojiScriptLoaded = true;
-  }, []);
-
-  useEffect(() => {
-    const picker = emojiPickerRef.current as any;
-    if (!picker) return;
-
-    const handleEmojiClick = (event: any) => {
-      const emoji = event?.detail?.unicode;
-      if (!emoji) return;
-
-      setInput((current) => `${current}${emoji}`);
-    };
-
-    picker.addEventListener("emoji-click", handleEmojiClick);
-
-    return () => {
-      picker.removeEventListener("emoji-click", handleEmojiClick);
-    };
-  }, [showEmojiPicker]);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (!emojiPickerWrapRef.current) return;
 
@@ -1825,12 +1826,27 @@ export default function ChatPage() {
             </button>
 
             {showEmojiPicker && (
-              <div className="emoji-picker-popover">
-                {createElement("emoji-picker", {
-                  ref: (node: Element | null) => {
-                    emojiPickerRef.current = node as HTMLElement | null;
-                  }
-                })}
+              <div className="emoji-picker-popover local-emoji-popover">
+                <div className="emoji-picker-header">
+                  <strong>Emoji</strong>
+                  <span>Local picker. No third-party script is loaded.</span>
+                </div>
+
+                <div className="emoji-grid-local">
+                  {EMOJI_PICKER_OPTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      className="emoji-option-button"
+                      type="button"
+                      onClick={() => {
+                        setInput((current) => `${current}${emoji}`);
+                        setShowEmojiPicker(false);
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -2,61 +2,61 @@ import { NextRequest, NextResponse } from "next/server";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-function getSupabaseOrigin() {
-  const value = process.env.NEXT_PUBLIC_SUPABASE_URL;
+function getSupabaseSources() {
+  const value = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 
   if (!value) {
-    return "https://*.supabase.co";
+    return [];
   }
 
   try {
-    return new URL(value).origin;
+    const origin = new URL(value).origin;
+    const websocketOrigin = origin
+      .replace(/^https:/, "wss:")
+      .replace(/^http:/, "ws:");
+
+    return [origin, websocketOrigin];
   } catch {
-    return "https://*.supabase.co";
+    return [];
   }
 }
 
 export function proxy(request: NextRequest) {
   const nonce = crypto.randomUUID().replaceAll("-", "");
-  const supabaseOrigin = getSupabaseOrigin();
+  const supabaseSources = getSupabaseSources();
 
-  const connectSources = [
-    "'self'",
-    supabaseOrigin,
-    "https://*.supabase.co",
-    "wss://*.supabase.co",
-    "stun:",
-    "turn:"
-  ];
+  const connectSources = ["'self'", ...supabaseSources, "stun:", "turn:"];
 
   if (isDev) {
     connectSources.push(
       "http://localhost:*",
       "ws://localhost:*",
       "http://127.0.0.1:*",
-      "ws://127.0.0.1:*"
+      "ws://127.0.0.1:*",
+      "https://*.supabase.co",
+      "wss://*.supabase.co"
     );
   }
 
   const scriptSources = isDev
-    ? "'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net"
-    : `'self' 'nonce-${nonce}' 'strict-dynamic' https://cdn.jsdelivr.net`;
+    ? "'self' 'unsafe-inline' 'unsafe-eval'"
+    : `'self' 'nonce-${nonce}' 'strict-dynamic'`;
 
-  const styleSources = isDev
-    ? "'self' 'unsafe-inline'"
-    : "'self' 'unsafe-inline'";
+  const styleSources = isDev ? "'self' 'unsafe-inline'" : "'self'";
 
   const csp = [
     "default-src 'self'",
     `script-src ${scriptSources}`,
+    "script-src-attr 'none'",
     `style-src ${styleSources}`,
-    `img-src 'self' data: blob:`,
-    `font-src 'self' data:`,
+    "style-src-attr 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
     `connect-src ${connectSources.join(" ")}`,
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
     "object-src 'none'",
-    "base-uri 'self'",
+    "base-uri 'none'",
     "form-action 'self'",
     "frame-ancestors 'none'",
     "manifest-src 'self'",

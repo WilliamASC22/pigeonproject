@@ -185,7 +185,7 @@ export async function unlockUserKeyBundle(
       name: "ECDH",
       namedCurve: "P-256"
     },
-    true,
+    false,
     ["deriveBits"]
   );
 
@@ -196,7 +196,7 @@ export async function unlockUserKeyBundle(
       name: "ECDH",
       namedCurve: "P-256"
     },
-    true,
+    false,
     []
   );
 
@@ -217,7 +217,7 @@ export async function importPublicEcdhKey(
       name: "ECDH",
       namedCurve: "P-256"
     },
-    true,
+    false,
     []
   );
 }
@@ -241,9 +241,14 @@ async function importChatKey(rawChatKey: ArrayBuffer): Promise<CryptoKey> {
       name: "AES-GCM",
       length: 256
     },
-    true,
+    false,
     ["encrypt", "decrypt"]
   );
+}
+
+export async function hardenChatKey(chatKey: CryptoKey): Promise<CryptoKey> {
+  const rawChatKey = await crypto.subtle.exportKey("raw", chatKey);
+  return importChatKey(rawChatKey);
 }
 
 async function deriveChatWrappingKey(

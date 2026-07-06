@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
+
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "PigeonProject 🕊️",
+  title: "PigeonProject | Secure Messaging",
   description:
-    "PigeonProject is a privacy-focused messenger app with direct chats, group chats, encrypted saved messages, emoji support, and browser-based calling.",
+    "PigeonProject is a public web messenger designed for saved, encrypted conversations. Message content is encrypted in the browser before it is stored.",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",
