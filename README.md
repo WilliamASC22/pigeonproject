@@ -2,7 +2,7 @@
 
 PigeonProject is a web based encrypted messenger app built with Next.js, Supabase, and Vercel.
 
-The project lets users create an account, choose a username, add contacts by username, accept or reject contact requests, start direct chats, create group chats, send saved encrypted messages, use emoji and preset GIF-style reactions, and place browser based voice or video calls.
+The project lets users create an account, choose a username, add contacts by username, accept or reject contact requests, start direct chats, create group chats, send saved encrypted messages, use emoji and preset GIF style reactions, and place browser based voice or video calls.
 
 The goal of PigeonProject is to build a real public messaging app that is simple to use, cloud hosted, privacy focused, and designed so normal message content is not stored in readable form on the backend.
 
