@@ -18,7 +18,7 @@ The app currently supports:
 • Username setup  
 • Contacts by username  
 • Contact requests with accept and reject  
-• A 1-minute wait before someone can resend a rejected or repeated request  
+• A 1 minute wait before someone can resend a rejected or repeated request  
 • Direct chats with accepted contacts  
 • Group chat creation from accepted contacts  
 • Saved encrypted message history  
