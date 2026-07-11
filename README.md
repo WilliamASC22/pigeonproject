@@ -22,7 +22,7 @@ The app currently supports:
 • Direct chats with accepted contacts  
 • Group chat creation from accepted contacts  
 • Saved encrypted message history  
-• Browser-based encryption before messages are saved  
+• Browser based encryption before messages are saved  
 • Per-user encryption setup with an encryption password  
 • Per-chat encrypted chat keys  
 • Emoji picker  
