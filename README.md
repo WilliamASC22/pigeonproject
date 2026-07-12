@@ -23,7 +23,7 @@ The app currently supports:
 • Group chat creation from accepted contacts  
 • Saved encrypted message history  
 • Browser based encryption before messages are saved  
-• Per-user encryption setup with an encryption password  
+• Per user encryption setup with an encryption password  
 • Per-chat encrypted chat keys  
 • Emoji picker  
 • Preset GIF-style reaction messages  
