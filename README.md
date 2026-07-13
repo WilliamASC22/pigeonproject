@@ -24,7 +24,7 @@ The app currently supports:
 • Saved encrypted message history  
 • Browser based encryption before messages are saved  
 • Per user encryption setup with an encryption password  
-• Per-chat encrypted chat keys  
+• Per chat encrypted chat keys  
 • Emoji picker  
 • Preset GIF-style reaction messages  
 • Browser-based voice calls  
