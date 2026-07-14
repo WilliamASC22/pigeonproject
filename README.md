@@ -26,7 +26,7 @@ The app currently supports:
 • Per user encryption setup with an encryption password  
 • Per chat encrypted chat keys  
 • Emoji picker  
-• Preset GIF-style reaction messages  
+• Preset GIF style reaction messages  
 • Browser-based voice calls  
 • Browser-based video calls  
 • Incoming call UI while the app is open  
