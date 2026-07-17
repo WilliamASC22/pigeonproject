@@ -28,7 +28,7 @@ The app currently supports:
 • Emoji picker  
 • Preset GIF style reaction messages  
 • Browser based voice calls  
-• Browser-based video calls  
+• Browser based video calls  
 • Incoming call UI while the app is open  
 • Separate Contacts page  
 • Separate Groups page  
