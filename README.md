@@ -36,7 +36,7 @@ The app currently supports:
 
 ## Important security note
 
-PigeonProject is privacy focused, but it is not government-certified, professionally audited, or a replacement for Signal, WhatsApp, or iMessage.
+PigeonProject is privacy focused, but it is not government certified, professionally audited, or a replacement for Signal, WhatsApp, or iMessage.
 
 The app uses strong browser cryptography patterns, including AES-256-GCM message encryption, ECDH P-256 key agreement, HKDF-SHA-256 key derivation, and PBKDF2-SHA-256 for protecting each user’s private key with an encryption password.
 
