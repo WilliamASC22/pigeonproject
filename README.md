@@ -42,7 +42,7 @@ The app uses strong browser cryptography patterns, including AES-256-GCM message
 
 However, this project has not gone through a professional security audit, formal penetration test, or FIPS/government certification process.
 
-Do not use this version for highly sensitive, dangerous, legal, medical, financial, or life-safety information.
+Do not use this version for highly sensitive, dangerous, legal, medical, financial, or life safety information.
 
 A safer public description is:
 
