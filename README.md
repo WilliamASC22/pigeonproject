@@ -66,7 +66,7 @@ PigeonProject uses a Next.js frontend and a Supabase backend.
 
 The frontend is the part users see in the browser. It handles login, chat, contacts, groups, encryption setup, message input, message display, emoji picker, call controls, incoming call UI, and active call UI.
 
-Supabase handles authentication, user profiles, usernames, contacts, contact requests, chats, chat members, saved encrypted messages, encrypted chat keys, realtime message updates, and signaling messages used to help establish browser-based calls.
+Supabase handles authentication, user profiles, usernames, contacts, contact requests, chats, chat members, saved encrypted messages, encrypted chat keys, realtime message updates, and signaling messages used to help establish browser based calls.
 
 Vercel hosts the app online so users can access it through a public website.
 
