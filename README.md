@@ -84,7 +84,7 @@ Vercel hosts the app online so users can access it through a public website.
 • Vercel  
 • CSS  
 • Tailwind CSS  
-• emoji-picker-element  
+• emoji picker-element  
 
 ## Project structure
 
