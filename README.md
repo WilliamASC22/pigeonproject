@@ -146,7 +146,7 @@ This contains the main Supabase functions for profiles, usernames, contacts, con
 src/lib/crypto.ts
 ```
 
-This contains the browser encryption functions used for user encryption keys, encrypted private-key vaults, wrapped chat keys, and encrypted messages.
+This contains the browser encryption functions used for user encryption keys, encrypted private key vaults, wrapped chat keys, and encrypted messages.
 
 ```txt
 proxy.ts
