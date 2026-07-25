@@ -180,7 +180,7 @@ It shows:
 • Accepted contacts  
 • Message area  
 • Emoji picker  
-• GIF-style reaction picker  
+• GIF style reaction picker  
 • Voice call button  
 • Video call button  
 • Logout button  
