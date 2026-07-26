@@ -410,7 +410,7 @@ When a user creates a group:
 9. The app encrypts the group chat key separately for each member.
 10. The group appears on the chat page.
 
-## Emoji and GIF-style reaction flow
+## Emoji and GIF style reaction flow
 
 When a user clicks the emoji button:
 
