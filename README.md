@@ -457,7 +457,7 @@ The project includes stronger browser security headers through `proxy.ts`.
 The headers are intended to help reduce common browser attack risks, including:
 
 • Clickjacking  
-• Some cross-site scripting risks  
+• Some cross site scripting risks  
 • MIME sniffing  
 • Unwanted browser permissions  
 • Insecure content loading  
