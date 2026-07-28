@@ -473,7 +473,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 • Contact requests by username  
 • Accept contact requests  
 • Reject contact requests  
-• 1-minute retry wait after rejected or repeated requests  
+• 1 minute retry wait after rejected or repeated requests  
 • Accepted contacts list  
 • Direct chats  
 • Group chats  
