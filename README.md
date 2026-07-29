@@ -480,7 +480,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 • Separate Contacts page  
 • Separate Groups page  
 • Saved message history  
-• Browser-based encrypted messages  
+• Browser based encrypted messages  
 • User-owned encryption key pair  
 • Encrypted private-key vault  
 • Per-chat encrypted chat keys  
