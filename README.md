@@ -481,7 +481,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 • Separate Groups page  
 • Saved message history  
 • Browser based encrypted messages  
-• User-owned encryption key pair  
+• User owned encryption key pair  
 • Encrypted private-key vault  
 • Per-chat encrypted chat keys  
 • Sender username shown under messages  
