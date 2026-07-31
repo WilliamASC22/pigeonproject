@@ -482,7 +482,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 • Saved message history  
 • Browser based encrypted messages  
 • User owned encryption key pair  
-• Encrypted private-key vault  
+• Encrypted private key vault  
 • Per-chat encrypted chat keys  
 • Sender username shown under messages  
 • Full emoji picker  
