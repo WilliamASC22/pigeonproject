@@ -486,7 +486,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 • Per chat encrypted chat keys  
 • Sender username shown under messages  
 • Full emoji picker  
-• Preset GIF-style reactions  
+• Preset GIF style reactions  
 • Supabase backend  
 • Supabase Realtime message updates  
 • Public deployment through Vercel  
