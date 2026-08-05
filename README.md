@@ -491,7 +491,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 • Supabase Realtime message updates  
 • Public deployment through Vercel  
 • Browser based voice calls  
-• Browser-based video calls  
+• Browser based video calls  
 • Incoming call UI  
 • Active call UI for direct and group chats  
 
