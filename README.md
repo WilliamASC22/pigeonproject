@@ -497,8 +497,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 
 ## Current limitations
 
-• The project has not had a professional security audit  
-• The project is not government-certified  
+• The project has not had a professional security audit   
 • The project is not a full Signal Protocol implementation  
 • The project does not currently support multi-device key sync  
 • If users forget their encryption password, saved messages may not be recoverable  
