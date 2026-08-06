@@ -499,7 +499,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 
 • The project has not had a professional security audit   
 • The project is not a full Signal Protocol implementation  
-• The project does not currently support multi-device key sync  
+• The project does not currently support multi device key sync  
 • If users forget their encryption password, saved messages may not be recoverable  
 • Incoming call UI only appears if the other user already has the app open  
 • Calls depend on browser microphone and camera permissions  
