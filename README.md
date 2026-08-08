@@ -514,7 +514,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 ## Future improvements
 
 • Professional security audit  
-• Stronger production-grade E2EE protocol  
+• Stronger production grade E2EE protocol  
 • Signal Protocol or similar ratcheting protocol  
 • Better key verification between users  
 • Safer account recovery design  
