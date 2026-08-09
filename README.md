@@ -518,7 +518,7 @@ Security headers are helpful, but they do not make an app impossible to hack.
 • Signal Protocol or similar ratcheting protocol  
 • Better key verification between users  
 • Safer account recovery design  
-• Multi-device support  
+• Multi device support  
 • Push notifications  
 • Background call notifications  
 • Missed call records  
