@@ -639,6 +639,6 @@ For groups:
 
 ## Project purpose
 
-PigeonProject was created to explore how a public messenger app can be built with free tools, saved cloud messages, direct chats, group chats, contact requests, username-based discovery, browser-based calling, and privacy-focused encrypted message storage.
+PigeonProject was created to explore how a public messenger app can be built with free tools, saved cloud messages, direct chats, group chats, contact requests, username based discovery, browser-based calling, and privacy-focused encrypted message storage.
 
 The project shows skills in frontend development, backend integration, authentication, database design, Supabase Row Level Security, realtime systems, encryption design, WebRTC signaling, deployment, and secure app design.
