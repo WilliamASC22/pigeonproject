@@ -46,7 +46,7 @@ Do not use this version for highly sensitive, dangerous, legal, medical, financi
 
 A safer public description is:
 
-PigeonProject uses browser based end to end encryption with user-owned encryption keys and encrypted saved messages.
+PigeonProject uses browser based end to end encryption with user owned encryption keys and encrypted saved messages.
 
 Do not claim:
 
