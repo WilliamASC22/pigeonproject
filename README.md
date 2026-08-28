@@ -52,9 +52,6 @@ Do not claim:
 
 PigeonProject is impossible to hack.
 
-Do not claim:
-
-PigeonProject is Signal-level secure.
 
 ## How the app works
 
