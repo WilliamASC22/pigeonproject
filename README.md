@@ -48,10 +48,6 @@ A safer public description is:
 
 PigeonProject uses browser based end to end encryption with user owned encryption keys and encrypted saved messages.
 
-Do not claim:
-
-PigeonProject is impossible to hack.
-
 
 ## How the app works
 
