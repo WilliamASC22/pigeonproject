@@ -93,7 +93,7 @@ This is the login page where users sign in or create an account.
 app/chat/page.tsx
 ```
 
-This is the main messaging page. It shows saved chats, accepted contacts, messages, emoji tools, GIF-style reactions, call buttons, incoming call UI, and active call UI.
+This is the main messaging page. It shows saved chats, accepted contacts, messages, emoji tools, GIF style reactions, call buttons, incoming call UI, and active call UI.
 
 ```txt
 app/chat/chat.css
