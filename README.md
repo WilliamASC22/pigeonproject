@@ -417,7 +417,7 @@ When a user clicks the GIF button:
 
 ## Calling flow
 
-PigeonProject supports browser-based voice and video calling through WebRTC.
+PigeonProject supports browser based voice and video calling through WebRTC.
 
 When a user starts a call:
 
