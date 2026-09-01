@@ -316,7 +316,7 @@ This allows each member to decrypt messages in the chat without the server stori
 
 ## Encryption design
 
-PigeonProject currently uses browser-based encryption.
+PigeonProject currently uses browser based encryption.
 
 The app creates a key pair for each user.
 
