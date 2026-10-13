@@ -89,22 +89,19 @@ export default function LoginPage() {
         return;
       }
 
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: cleanEmail,
-        password: accountPassword
+        password: accountPassword,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`
+        }
       });
 
       if (error) {
         throw error;
       }
 
-      if (data.user) {
-        await createProfile(data.user);
-      }
-
-      showInfo(
-        "Account created. If email confirmation is required, check your inbox before signing in."
-      );
+      showInfo("Account created. Check your email to confirm your account, then sign in.");
 
       setAuthMode("signin");
       setAccountPassword("");
