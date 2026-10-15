@@ -1,22 +1,25 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
 
 export default function Home() {
+  const router = useRouter();
+
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
 
       if (data.user) {
-        window.location.href = "/chat";
+        router.replace("/chat");
       } else {
-        window.location.href = "/login";
+        router.replace("/login");
       }
     };
 
-    checkUser();
-  }, []);
+    void checkUser();
+  }, [router]);
 
   return <div>Loading PigeonProject...</div>;
 }

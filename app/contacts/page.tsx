@@ -63,10 +63,12 @@ export default function ContactsPage() {
   }, [requests, user?.id]);
 
   const loadData = useCallback(async (userId: string) => {
-    const nextContacts = await getMyContacts(userId);
-    setContacts(nextContacts);
+    const [nextContacts, nextRequests] = await Promise.all([
+      getMyContacts(userId),
+      getContactRequests(userId)
+    ]);
 
-    const nextRequests = await getContactRequests(userId);
+    setContacts(nextContacts);
     setRequests(nextRequests);
   }, []);
 

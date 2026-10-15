@@ -662,10 +662,13 @@ export default function ChatPage() {
   }, [broadcastSignal, createOfferForUser, getOrCreatePeerConnection, user]);
 
   const refreshUsersAndChats = useCallback(async (currentUserId: string) => {
-    const contacts = await getMyContacts(currentUserId);
+    // These calls don't depend on each other; waiting for them sequentially
+    // adds one full network round-trip to every contacts/chats refresh.
+    const [contacts, myChats] = await Promise.all([
+      getMyContacts(currentUserId),
+      getMyChats(currentUserId)
+    ]);
     setUsers(contacts.filter((u) => u.id !== currentUserId));
-
-    const myChats = await getMyChats(currentUserId);
     setChats(myChats as ChatItem[]);
   }, []);
 
@@ -796,10 +799,10 @@ export default function ChatPage() {
     async (plainText: string) => {
       if (!chatId || !user || !activeKey) return;
 
+      const sendingChatId = chatId;
       const encrypted = await encryptMessage(plainText, activeKey);
-
-      await sendMessage({
-        chat_id: chatId,
+      const saved = await sendMessage({
+        chat_id: sendingChatId,
         sender_id: user.id,
         ciphertext: encrypted.ciphertext,
         iv: encrypted.iv,
@@ -807,10 +810,22 @@ export default function ChatPage() {
         algorithm: encrypted.algorithm
       });
 
-      await loadMessages(chatId, activeKey);
-      await refreshUsersAndChats(user.id);
+      // Only update after the database confirms that the ciphertext was saved.
+      // The realtime event could arrive first, so avoid duplicate messages.
+      if (currentChatIdRef.current === sendingChatId) {
+        setMessages((current) =>
+          current.some((message) => String(message.id) === String(saved.id))
+            ? current
+            : [...current, {
+                ...saved,
+                text: plainText,
+                sender_username: username,
+                sender_email: "Private user"
+              }]
+        );
+      }
     },
-    [activeKey, chatId, loadMessages, refreshUsersAndChats, user]
+    [activeKey, chatId, user, username]
   );
 
   const handleSendGif = async (gifId: string) => {
@@ -992,6 +1007,10 @@ export default function ChatPage() {
   useEffect(() => {
     if (!chatId || !activeKey) return;
 
+    let stopped = false;
+    let subscribedBefore = false;
+    const members = activeChat?.members || [];
+
     const channel = supabase
       .channel(`messages-${chatId}`)
       .on(
@@ -1002,20 +1021,69 @@ export default function ChatPage() {
           table: "messages",
           filter: `chat_id=eq.${chatId}`
         },
-        async () => {
-          await loadMessages(chatId, activeKey);
+        async (payload) => {
+          const row = payload.new as {
+            id: number;
+            chat_id: string;
+            sender_id: string;
+            ciphertext?: string;
+            iv?: string;
+            crypto_version?: number;
+            created_at: string;
+          };
 
-          if (user?.id) {
-            await refreshUsersAndChats(user.id);
+          if (stopped || !row || row.chat_id !== chatId) return;
+
+          // A large realtime event can be truncated. Fetch history rather
+          // than display an incomplete ciphertext record.
+          if (!row.ciphertext || !row.iv) {
+            await loadMessages(chatId, activeKey);
+            return;
           }
+
+          let text: string;
+          try {
+            text = await decryptMessage(row.ciphertext, row.iv, activeKey);
+          } catch {
+            text = "⚠️ cannot decrypt";
+          }
+
+          if (stopped || currentChatIdRef.current !== chatId) return;
+
+          const sender = members.find((member) => member.id === row.sender_id);
+          const senderUsername = row.sender_id === user?.id
+            ? username
+            : sender?.username || "";
+
+          setMessages((current) => {
+            if (current.some((message) => String(message.id) === String(row.id))) {
+              return current;
+            }
+            return [...current, {
+              ...row,
+              text,
+              sender_username: senderUsername,
+              sender_email: "Private user"
+            }];
+          });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Catch up if we were offline. The initial open already fetched
+          // history, so don't repeat it on the first subscription.
+          if (subscribedBefore) {
+            void loadMessages(chatId, activeKey);
+          }
+          subscribedBefore = true;
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      stopped = true;
+      void supabase.removeChannel(channel);
     };
-  }, [chatId, activeKey, loadMessages, refreshUsersAndChats, user?.id]);
+  }, [chatId, activeKey, loadMessages, activeChat?.members, user?.id, username]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

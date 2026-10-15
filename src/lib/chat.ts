@@ -192,11 +192,11 @@ export async function getProfilesForChatKey(userIds: string[]) {
 
   const uniqueUserIds = Array.from(new Set(userIds));
 
-  for (const userId of uniqueUserIds) {
-    if (userId !== user.id) {
-      await requireAcceptedContact(user.id, userId);
-    }
-  }
+  await Promise.all(
+    uniqueUserIds
+      .filter((userId) => userId !== user.id)
+      .map((userId) => requireAcceptedContact(user.id, userId))
+  );
 
   const { data, error } = await supabase
     .from("profiles")
@@ -691,12 +691,22 @@ export async function sendMessage(payload: {
     algorithm: payload.algorithm || "AES-256-GCM"
   };
 
-  const { error } = await supabase.from("messages").insert(safePayload);
+  // Return the saved encrypted row in the same request so the UI doesn't
+  // need to download and decrypt the whole conversation after every send.
+  const { data, error } = await supabase
+    .from("messages")
+    .insert(safePayload)
+    .select(
+      "id, chat_id, sender_id, ciphertext, iv, crypto_version, algorithm, created_at"
+    )
+    .single();
 
   if (error) {
     console.error("sendMessage error:", error);
     throw error;
   }
+
+  return data;
 }
 
 export async function getMessages(chatId: string) {
