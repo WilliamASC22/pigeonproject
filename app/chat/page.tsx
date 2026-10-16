@@ -235,6 +235,9 @@ export default function ChatPage() {
 
     try {
       return new Intl.DateTimeFormat([], {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
         hour: "numeric",
         minute: "2-digit"
       }).format(new Date(value));
